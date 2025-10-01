@@ -86,13 +86,6 @@ end
 include Expander.Make (T)
 include T
 
-let ghost =
-  object
-    inherit Ast_traverse.map
-    method! location l = { l with loc_ghost = true }
-  end
-;;
-
 let parts loc fields ~type_declaration_is_unboxed =
   let fields = Common.identifiable_fields fields in
   let params = [] in
@@ -121,7 +114,8 @@ let extension name ~f =
     name
     Extension.Context.expression
     Ast_pattern.(ptyp __)
-    (fun ~loc ~path:(_ : string) type_ -> f (ghost#location loc) (ghost#core_type type_))
+    (fun ~loc ~path:(_ : string) type_ ->
+      f (Ppx_helpers.ghoster#location loc) (Ppx_helpers.ghoster#core_type type_))
 ;;
 
 let extensions =

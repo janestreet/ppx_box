@@ -2,6 +2,7 @@ open! Ppxlib
 open! Stdppx
 open Ast_builder.Default
 include Expander_intf
+module Monomorphize = Ppx_template_expander.Monomorphize
 
 let with_suffix loc s ~type_name =
   (match Ppx_helpers.demangle_template type_name with
@@ -32,7 +33,6 @@ module Make (X : X) : S with type t = X.t = struct
     let unboxed = unboxed x loc ~type_name ~params in
     let arrow = Arrow.create loc ~boxed:boxed.type_ ~unboxed:unboxed.type_ in
     [%str
-      [%%template
       let [%p ppat_var Common.box] : [%t arrow.box] =
         fun [%p unboxed.pattern] -> [%e boxed.expression] [@exclave_if_stack a]
       [@@alloc a @ m = (heap_global, stack_local)]
@@ -41,7 +41,12 @@ module Make (X : X) : S with type t = X.t = struct
       let [%p ppat_var Common.unbox] : [%t arrow.unbox] =
         fun [%p boxed.pattern] -> [%e unboxed.expression]
       [@@mode m = (global, local)]
-      ;;]]
+      ;;]
+    (* We directly expand the templated code so that the deriving ppx ignores all values,
+       instead of just ignoring the value written concretely and forgetting about the
+       templated values.
+    *)
+    |> Monomorphize.t_no_inline#structure Monomorphize.Context.top
   ;;
 
   let locality_attribute loc =
