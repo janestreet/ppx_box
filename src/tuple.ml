@@ -131,7 +131,7 @@ let extensions =
       ~f:
         (box ~f:(fun loc ~boxed ~unboxed ->
            [%expr
-             fun ([%p unboxed.pattern] : [%t unboxed.type_]) : [%t boxed.type_] ->
+             fun ([%p unboxed.pattern] : [%t unboxed.type_] @ local) : [%t boxed.type_] -> exclave_
                [%e boxed.expression]]))
   ; extension
       Common.unbox
@@ -145,7 +145,7 @@ let extensions =
       ~f:
         (unbox ~f:(fun loc ~boxed ~unboxed ->
            [%expr
-             fun ([%p boxed.pattern] : [%t boxed.type_]) : [%t unboxed.type_] ->
+             fun ([%p boxed.pattern] : [%t boxed.type_] @ local) : [%t unboxed.type_] -> exclave_
                [%e unboxed.expression]]))
   ]
 ;;

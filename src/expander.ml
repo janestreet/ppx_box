@@ -18,8 +18,8 @@ module Arrow = struct
     }
 
   let create loc ~boxed ~unboxed =
-    { box = [%type: [%t unboxed] -> [%t boxed]]
-    ; unbox = [%type: [%t boxed] -> [%t unboxed]]
+    { box = [%type: [%t unboxed] @ m -> [%t boxed] @ m]
+    ; unbox = [%type: [%t boxed] @ m -> [%t unboxed] @ m]
     }
   ;;
 end
