@@ -11,3 +11,4 @@ val identifiable_fields
 
 val box : label
 val unbox : label
+val boxed : label

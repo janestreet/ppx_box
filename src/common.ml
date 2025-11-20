@@ -9,3 +9,4 @@ let lident loc name = Loc.make ~loc (Lident name)
 let identifiable_fields = List.map ~f:(fun (label, type_) -> label, gen_symbol (), type_)
 let box = "box"
 let unbox = "unbox"
+let boxed = "boxed"

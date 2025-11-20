@@ -1,0 +1,6 @@
+(library
+ (name ppx_box_lib)
+ (public_name ppx_box.lib)
+ (libraries)
+ (preprocess
+  (pps ppx_template ppx_shorthand)))

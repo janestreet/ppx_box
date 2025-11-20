@@ -1,0 +1,58 @@
+# ppx_box
+
+# Overview
+
+`ppx_box` is a ppx that generates `box` and `unbox` functions to convert product types
+(records and tuples) between their boxed and unboxed layout representations.
+
+## Deriving ppx
+
+The ppx can be derived on records, tuples, or unboxed tuples. E.g.:
+
+```ocaml
+# type t =
+    { a : int
+    ; b : string
+    }
+  [@@deriving box]
+type t = { a : int; b : string; }
+val box : t# -> t = <fun>
+val box__stack : local_ t# -> local_ t = <fun>
+val unbox : t -> t# = <fun>
+val unbox__local : local_ t -> local_ t# = <fun>
+val boxed : unit -> (t, t#) Ppx_box_lib.Boxed.t = <fun>
+```
+
+
+```ocaml
+# type t = int * string [@@deriving box]
+type t = int * string
+val box : #(int * string) -> t = <fun>
+val box__stack : local_ #(int * string) -> local_ t = <fun>
+val unbox : t -> #(int * string) = <fun>
+val unbox__local : local_ t -> local_ #(int * string) = <fun>
+val boxed : unit -> (t, #(int * string)) Ppx_box_lib.Boxed.t = <fun>
+```
+
+## Extension ppx
+
+There is also an extension ppx for anonymous tuples. E.g.:
+
+```ocaml
+# let box = [%box: #(int * string)]
+val box : #(int * string) -> int * string = <fun>
+
+# let unbox = [%unbox: (int * string)]
+val unbox : int * string -> #(int * string) = <fun>
+```
+
+Both `[%box]` and `[%unbox]` can be used with ppx-template for local/stack versions of the
+function. E.g.:
+
+```ocaml
+# let box = [%box: #(int * string)] [@alloc stack]
+val box : local_ #(int * string) -> local_ int * string = <fun>
+
+# let unbox = [%unbox: (int * string)] [@mode local]
+val unbox : local_ int * string -> local_ #(int * string) = <fun>
+```
