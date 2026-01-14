@@ -17,9 +17,9 @@ The ppx can be derived on records, tuples, or unboxed tuples. E.g.:
   [@@deriving box]
 type t = { a : int; b : string; }
 val box : t# -> t = <fun>
-val box__stack : local_ t# -> local_ t = <fun>
+val box__stack : t# @ local -> t @ local = <fun>
 val unbox : t -> t# = <fun>
-val unbox__local : local_ t -> local_ t# = <fun>
+val unbox__local : t @ local -> t# @ local = <fun>
 val boxed : unit -> (t, t#) Ppx_box_lib.Boxed.t = <fun>
 ```
 
@@ -28,9 +28,9 @@ val boxed : unit -> (t, t#) Ppx_box_lib.Boxed.t = <fun>
 # type t = int * string [@@deriving box]
 type t = int * string
 val box : #(int * string) -> t = <fun>
-val box__stack : local_ #(int * string) -> local_ t = <fun>
+val box__stack : #(int * string) @ local -> t @ local = <fun>
 val unbox : t -> #(int * string) = <fun>
-val unbox__local : local_ t -> local_ #(int * string) = <fun>
+val unbox__local : t @ local -> #(int * string) @ local = <fun>
 val boxed : unit -> (t, #(int * string)) Ppx_box_lib.Boxed.t = <fun>
 ```
 
@@ -51,8 +51,8 @@ function. E.g.:
 
 ```ocaml
 # let box = [%box: #(int * string)] [@alloc stack]
-val box : local_ #(int * string) -> local_ int * string = <fun>
+val box : #(int * string) @ local -> int * string @ local = <fun>
 
 # let unbox = [%unbox: (int * string)] [@mode local]
-val unbox : local_ int * string -> local_ #(int * string) = <fun>
+val unbox : int * string @ local -> #(int * string) @ local = <fun>
 ```
