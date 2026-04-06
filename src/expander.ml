@@ -159,7 +159,7 @@ module Make (X : X) : S with type t = X.t = struct
        instead of just ignoring the value written concretely and forgetting about the
        templated values.
     *)
-    |> Monomorphize.t_no_inline#structure Monomorphize.Context.top
+    |> Monomorphize.t#structure Monomorphize.Context.top
   ;;
 
   let mode_attribute loc =
