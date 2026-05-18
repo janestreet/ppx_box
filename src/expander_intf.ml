@@ -22,8 +22,8 @@ module type S = sig
   type ('a, 'b) expander := ('a, 'b) t
   type t
 
-  val structure_items : (t, structure_item list) expander
-  val signature_items : (t, signature_item list) expander
+  val structure_items : portable:bool -> (t, structure_item list) expander
+  val signature_items : portable:bool -> (t, signature_item list) expander
 end
 
 module type Expander = sig

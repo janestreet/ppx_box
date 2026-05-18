@@ -122,7 +122,7 @@ module type Boxed = sig @@ stateless
 
       In particular, it would be a mistake to create a witness for basically all of the
       unboxed number types! *)
-  val unsafe_create
+  val magic_create
     : ('a : value) ('b : any).
     (module S with type t = 'a and type u = 'b) -> ('a, 'b) t
   [@@zero_alloc]

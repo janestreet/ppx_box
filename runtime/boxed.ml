@@ -4,7 +4,7 @@ type ('a : value, 'b : any) t : void
 
 external make : ('a : value) ('b : any). unit -> ('a, 'b) t @@ stateless = "%unbox_unit"
 
-let unsafe_create
+let magic_create
   : ('a : value) ('b : any). (module S with type t = 'a and type u = 'b) -> ('a, 'b) t
   =
   fun _ -> make ()

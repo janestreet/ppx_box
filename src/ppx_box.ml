@@ -45,9 +45,10 @@ let deriving
 
 let () =
   let generate ~record ~tuple =
-    Deriving.Generator.make_noarg
-      (fun ~loc ~path:(_ : label) ((_ : rec_flag), type_declaration) ->
-         deriving loc type_declaration ~record ~tuple)
+    Deriving.Generator.make
+      Deriving.Args.(empty +> flag "portable")
+      (fun ~loc ~path:(_ : label) ((_ : rec_flag), type_declaration) portable ->
+        deriving loc type_declaration ~record:(record ~portable) ~tuple:(tuple ~portable))
   in
   let str_type_decl =
     generate ~record:Record.structure_items ~tuple:Tuple.structure_items

@@ -26,13 +26,19 @@ module Arrow = struct
     ; unbox : core_type
     }
 
-  let create loc ~boxed ~unboxed ~params =
+  let create loc ~boxed ~unboxed ~params ~portable =
     let ptyp_poly = ptyp_poly loc ~params in
     let boxed = boxed.type_
     and unboxed = unboxed.type_ in
-    { box = ptyp_poly [%type: [%t unboxed] @ m -> [%t boxed] @ m]
-    ; unbox = ptyp_poly [%type: [%t boxed] @ m -> [%t unboxed] @ m]
-    }
+    if portable
+    then
+      { box = ptyp_poly [%type: [%t unboxed] @ l p -> [%t boxed] @ l p]
+      ; unbox = ptyp_poly [%type: [%t boxed] @ l p -> [%t unboxed] @ l p]
+      }
+    else
+      { box = ptyp_poly [%type: [%t unboxed] @ l -> [%t boxed] @ l]
+      ; unbox = ptyp_poly [%type: [%t boxed] @ l -> [%t unboxed] @ l]
+      }
   ;;
 end
 
@@ -86,7 +92,7 @@ module Witness = struct
         end
 
         let [%p pvar Common.boxed] : [%t type_] =
-          fun () -> Ppx_box_lib.Boxed.unsafe_create (module Arg)
+          fun () -> Ppx_box_lib.Boxed.magic_create (module Arg)
         ;;]
     | arity when arity < 6 ->
       let payload =
@@ -137,40 +143,70 @@ end
 module Make (X : X) : S with type t = X.t = struct
   include X
 
-  let structure_items x loc ~type_name ~params =
+  let portable_mode_attributes ~portable loc =
+    if portable
+    then
+      [ attribute
+          ~loc
+          ~name:(Loc.make ~loc "mode")
+          ~payload:(PStr [%str p = (portable, shareable, nonportable)])
+      ]
+    else []
+  ;;
+
+  let structure_items ~portable x loc ~type_name ~params =
     let pvar s = with_suffix loc s ~type_name ~f:pvar in
     let boxed = boxed x loc ~type_name ~params in
     let unboxed = unboxed x loc ~type_name ~params in
-    let arrow = Arrow.create loc ~boxed ~unboxed ~params in
+    let arrow = Arrow.create loc ~boxed ~unboxed ~params ~portable in
     let witness = Witness.structure loc ~boxed ~unboxed ~type_name ~params in
-    [%str
-      let [%p pvar Common.box] : [%t arrow.box] =
-        fun [%p unboxed.pattern] -> [%e boxed.expression] [@exclave_if_stack a]
-      [@@alloc a @ m = (heap_global, stack_local)]
-      ;;
-
-      let [%p pvar Common.unbox] : [%t arrow.unbox] =
-        fun [%p boxed.pattern] -> [%e unboxed.expression]
-      [@@mode m = (global, local)]
-      ;;
-
-      include [%m pmod_structure ~loc witness]]
+    let box =
+      { Ppxlib_jane.Ast_builder.Default.(
+          value_binding
+            ~loc
+            ~pat:(ppat_constraint ~loc (pvar Common.box) (Some arrow.box) [])
+            ~expr:
+              [%expr
+                fun [%p unboxed.pattern] -> [%e boxed.expression] [@exclave_if_stack a]]
+            ~modes:[])
+        with
+        pvb_attributes =
+          [ attribute
+              ~loc
+              ~name:(Loc.make ~loc "alloc")
+              ~payload:(PStr [%str a @ l = (heap_global, stack_local)])
+          ]
+          @ portable_mode_attributes ~portable loc
+      }
+    in
+    let unbox_mode_attribute =
+      attribute
+        ~loc
+        ~name:(Loc.make ~loc "mode")
+        ~payload:
+          (PStr
+             (if portable
+              then [%str l = (global, local), p = (portable, shareable, nonportable)]
+              else [%str l = (global, local)]))
+    in
+    let unbox =
+      { Ppxlib_jane.Ast_builder.Default.(
+          value_binding
+            ~loc
+            ~pat:(ppat_constraint ~loc (pvar Common.unbox) (Some arrow.unbox) [])
+            ~expr:[%expr fun [%p boxed.pattern] -> [%e unboxed.expression]]
+            ~modes:[])
+        with
+        pvb_attributes = [ unbox_mode_attribute ]
+      }
+    in
+    [ pstr_value ~loc Nonrecursive [ box ]; pstr_value ~loc Nonrecursive [ unbox ] ]
+    @ [%str include [%m pmod_structure ~loc witness]]
     (* We directly expand the templated code so that the deriving ppx ignores all values,
        instead of just ignoring the value written concretely and forgetting about the
        templated values.
     *)
     |> Monomorphize.t#structure Monomorphize.Context.top
-  ;;
-
-  let mode_attribute loc =
-    attribute ~loc ~name:(Loc.make ~loc "mode") ~payload:(PStr [%str m = (global, local)])
-  ;;
-
-  let alloc_attribute loc =
-    attribute
-      ~loc
-      ~name:(Loc.make ~loc "alloc")
-      ~payload:(PStr [%str a @ m = (heap_global, stack_local)])
   ;;
 
   let zero_alloc_attribute loc =
@@ -191,22 +227,37 @@ module Make (X : X) : S with type t = X.t = struct
         ~modalities:[ { txt = Modality "stateless"; loc } ]
         ~prim:[]
     in
-    { value_desc with pval_attributes = List.map attributes ~f:(( |> ) loc) }
-    |> psig_value ~loc
+    { value_desc with pval_attributes = attributes } |> psig_value ~loc
   ;;
 
-  let signature_items x loc ~type_name ~params =
+  let signature_items ~portable x loc ~type_name ~params =
     let boxed = boxed x loc ~type_name ~params in
     let unboxed = unboxed x loc ~type_name ~params in
-    let arrow = Arrow.create loc ~boxed ~unboxed ~params in
+    let arrow = Arrow.create loc ~boxed ~unboxed ~params ~portable in
     let witness_type = Witness.type_ loc ~boxed ~unboxed ~params in
+    let unbox_mode_attribute =
+      attribute
+        ~loc
+        ~name:(Loc.make ~loc "mode")
+        ~payload:
+          (PStr
+             (if portable
+              then [%str l = (global, local), p = (portable, shareable, nonportable)]
+              else [%str l = (global, local)]))
+    in
     [ [%sigi:
         [%%template:
         [%%i
           signature_item
             loc
             Common.box
-            [ alloc_attribute; zero_alloc_if_stack_attribute ]
+            ([ attribute
+                 ~loc
+                 ~name:(Loc.make ~loc "alloc")
+                 ~payload:(PStr [%str a @ l = (heap_global, stack_local)])
+             ]
+             @ portable_mode_attributes ~portable loc
+             @ [ zero_alloc_if_stack_attribute loc ])
             ~type_:arrow.box
             ~type_name]
 
@@ -214,7 +265,7 @@ module Make (X : X) : S with type t = X.t = struct
           signature_item
             loc
             Common.unbox
-            [ mode_attribute; zero_alloc_attribute ]
+            [ unbox_mode_attribute; zero_alloc_attribute loc ]
             ~type_:arrow.unbox
             ~type_name]
 
@@ -224,7 +275,7 @@ module Make (X : X) : S with type t = X.t = struct
             signature_item
               loc
               Common.boxed
-              [ zero_alloc_attribute ]
+              [ zero_alloc_attribute loc ]
               ~type_:witness_type
               ~type_name
           else [%sigi: include sig end]]]]

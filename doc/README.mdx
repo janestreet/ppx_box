@@ -34,6 +34,35 @@ val unbox__local : t @ local -> #(int * string) @ local = <fun>
 val boxed : unit -> (t, #(int * string)) Ppx_box_lib.Boxed.t = <fun>
 ```
 
+### `~portable`
+
+Pass `~portable` to additionally template `box` and `unbox` over portability:
+
+```ocaml
+# type t =
+    { a : int
+    ; b : string
+    }
+  [@@deriving box ~portable]
+type t = { a : int; b : string; }
+val box__portable : t# @ portable -> t @ portable = <fun>
+val box__portable__stack : t# @ local portable -> t @ local portable = <fun>
+val box__shareable : t# @ shareable -> t @ shareable = <fun>
+val box__shareable__stack : t# @ local shareable -> t @ local shareable =
+  <fun>
+val box : t# -> t = <fun>
+val box__stack : t# @ local -> t @ local = <fun>
+val unbox__portable : t @ portable -> t# @ portable = <fun>
+val unbox__shareable : t @ shareable -> t# @ shareable = <fun>
+val unbox : t -> t# = <fun>
+val unbox__local__portable : t @ local portable -> t# @ local portable =
+  <fun>
+val unbox__local__shareable : t @ local shareable -> t# @ local shareable =
+  <fun>
+val unbox__local : t @ local -> t# @ local = <fun>
+val boxed : unit -> (t, t#) Ppx_box_lib.Boxed.t = <fun>
+```
+
 ## Extension ppx
 
 There is also an extension ppx for anonymous tuples. E.g.:
