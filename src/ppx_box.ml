@@ -1,5 +1,6 @@
-open! Ppxlib
 open! Stdppx
+open! Ppxlib
+open Ppx_box_expander.Private
 
 let deriving
   :  location -> type_declaration list -> record:(Record.t, 'output) Expander.t

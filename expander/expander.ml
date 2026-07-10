@@ -4,12 +4,13 @@ open Ast_builder.Default
 include Expander_intf
 module Monomorphize = Ppx_template_expander.Monomorphize
 
-let with_suffix loc s ~type_name ~f =
-  (match Ppx_helpers.demangle_template type_name with
-   | "t", mangle -> s ^ mangle
-   | type_name, mangle -> s ^ "_" ^ type_name ^ mangle)
-  |> f ~loc
+let value_name s ~type_name =
+  match Ppx_helpers.demangle_template type_name with
+  | "t", mangle -> s ^ mangle
+  | type_name, mangle -> s ^ "_" ^ type_name ^ mangle
 ;;
+
+let with_suffix loc s ~type_name ~f = f ~loc (value_name s ~type_name)
 
 let ptyp_poly loc ~params =
   if List.is_empty params

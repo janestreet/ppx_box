@@ -2,8 +2,7 @@
  (name ppx_box)
  (public_name ppx_box)
  (kind ppx_rewriter)
- (libraries compiler-libs.common ppx_helpers ppx_template.expander ppxlib
-   ppxlib_jane ppxlib.stdppx)
  (ppx_runtime_libraries ppx_box.lib)
+ (libraries ppx_box_expander ppxlib ppxlib_jane ppxlib.stdppx)
  (preprocess
-  (pps ppxlib.metaquot)))
+  (pps ppx_jane)))
