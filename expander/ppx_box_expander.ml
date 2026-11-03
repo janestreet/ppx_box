@@ -15,6 +15,7 @@ let boxed_witness type_ =
 ;;
 
 module Private = struct
+  module Alias = Alias
   module Common = Common
   module Expander = Expander
   module Record = Record

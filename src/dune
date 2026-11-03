@@ -3,6 +3,7 @@
  (public_name ppx_box)
  (kind ppx_rewriter)
  (ppx_runtime_libraries ppx_box.lib)
- (libraries ppx_box_expander ppxlib ppxlib_jane ppxlib.stdppx)
- (preprocess
-  (pps ppx_jane)))
+ (libraries ppx_box_expander ppx_helpers ppxlib ppxlib_jane ppxlib.stdppx)
+ (preprocess no_preprocessing)
+ (lint
+  (pps ppx_js_style)))

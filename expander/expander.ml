@@ -53,91 +53,11 @@ module Witness = struct
 
   let structure loc ~(boxed : parts) ~(unboxed : parts) ~type_name ~params =
     let pvar s = with_suffix loc s ~type_name ~f:pvar in
-    let evar s = with_suffix loc s ~type_name ~f:evar in
-    let type_declaration (name, manifest) =
-      type_declaration
-        ~loc
-        ~name:(Loc.make ~loc name)
-        ~params:(List.map params ~f:(fun type_ -> type_, (NoVariance, NoInjectivity)))
-        ~cstrs:[]
-        ~kind:Ptype_abstract
-        ~private_:Public
-        ~manifest:(Some manifest.type_)
-    in
     let type_ = type_ loc ~boxed ~unboxed ~params in
-    let mod_ =
-      pmod_structure
-        ~loc
-        [%str
-          [%%i
-            pstr_type
-              ~loc
-              Nonrecursive
-              (List.map ~f:type_declaration [ "t", boxed; "u", unboxed ])]
-
-          let box u = ([%e evar Common.box] [@alloc a]) u [@exclave_if_stack a]
-          [@@alloc a = (heap, stack)]
-          ;;
-
-          let unbox t =
-            ([%e evar Common.unbox] [@mode m] [@zero_alloc assume_unless_opt])
-              t [@exclave_if_local m]
-          [@@mode m = (global, local)]
-          ;;]
-    in
-    match List.length params with
-    | 0 ->
-      [%str
-        open struct
-          module Arg = [%m mod_]
-        end
-
-        let [%p pvar Common.boxed] : [%t type_] =
-          fun () -> Ppx_box_lib.Boxed.magic_create (module Arg)
-        ;;]
-    | arity when arity < 6 ->
-      let payload =
-        List.map params ~f:(fun param ->
-          match Ppxlib_jane.get_type_param_name_and_jkind_of_core_type param with
-          | _, None -> [%expr (_ : (_ : value))]
-          | _, jkind ->
-            [%expr
-              (_
-               : [%t
-                   { param with
-                     ptyp_desc =
-                       Ppxlib_jane.Shim.Core_type_desc.to_parsetree (Ptyp_any jkind)
-                   }])])
-        |> function
-        | [] -> assert false
-        | [ param ] -> param
-        | param :: params ->
-          pexp_apply ~loc param (List.map params ~f:(fun param -> Nolabel, param))
-      in
-      let kind_attribute =
-        attribute
-          ~loc
-          ~name:(Loc.make ~loc "kind.explicit")
-          ~payload:(PStr [%str [%e payload]])
-      in
-      [%str
-        open
-          [%m
-          pmod_apply
-            ~loc
-            { (pmod_ident
-                 ~loc
-                 (Loc.make
-                    ~loc
-                    (Longident.parse
-                       (Printf.sprintf "Ppx_box_lib.Boxed.Unsafe_create%d" arity))))
-              with
-              pmod_attributes = [ kind_attribute ]
-            }
-            mod_]
-
-        let [%p pvar Common.boxed] : [%t type_] = fun () -> boxed ()]
-    | _ -> [%str]
+    [%str
+      let [%p pvar Common.boxed] : [%t type_] =
+        fun () -> Ppx_box_lib.Boxed.magic_create #()
+      ;;]
   ;;
 end
 
@@ -165,10 +85,12 @@ module Make (X : X) : S with type t = X.t = struct
       { Ppxlib_jane.Ast_builder.Default.(
           value_binding
             ~loc
-            ~pat:(ppat_constraint ~loc (pvar Common.box) (Some arrow.box) [])
+            ~pat:(pvar Common.box)
             ~expr:
               [%expr
                 fun [%p unboxed.pattern] -> [%e boxed.expression] [@exclave_if_stack a]]
+            ~constraint_:
+              (Some (Pvc_constraint { locally_abstract_univars = []; typ = arrow.box }))
             ~modes:[])
         with
         pvb_attributes =
@@ -194,8 +116,10 @@ module Make (X : X) : S with type t = X.t = struct
       { Ppxlib_jane.Ast_builder.Default.(
           value_binding
             ~loc
-            ~pat:(ppat_constraint ~loc (pvar Common.unbox) (Some arrow.unbox) [])
+            ~pat:(pvar Common.unbox)
             ~expr:[%expr fun [%p boxed.pattern] -> [%e unboxed.expression]]
+            ~constraint_:
+              (Some (Pvc_constraint { locally_abstract_univars = []; typ = arrow.unbox }))
             ~modes:[])
         with
         pvb_attributes = [ unbox_mode_attribute ]
@@ -207,7 +131,7 @@ module Make (X : X) : S with type t = X.t = struct
        instead of just ignoring the value written concretely and forgetting about the
        templated values.
     *)
-    |> Monomorphize.t#structure Monomorphize.Context.top
+    |> Monomorphize.t#structure (Monomorphize.Context.top ())
   ;;
 
   let zero_alloc_attribute loc =
@@ -271,15 +195,12 @@ module Make (X : X) : S with type t = X.t = struct
             ~type_name]
 
         [%%i
-          if List.length params < 6
-          then
-            signature_item
-              loc
-              Common.boxed
-              [ zero_alloc_attribute loc ]
-              ~type_:witness_type
-              ~type_name
-          else [%sigi: include sig end]]]]
+          signature_item
+            loc
+            Common.boxed
+            [ zero_alloc_attribute loc ]
+            ~type_:witness_type
+            ~type_name]]]
     ]
   ;;
 end

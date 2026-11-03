@@ -13,6 +13,7 @@ val boxed_witness : core_type -> expression
 module Private : sig
   (** These modules are only intended for use by [ppx_box] itself. *)
 
+  module Alias = Alias
   module Common = Common
   module Expander = Expander
   module Record = Record

@@ -4,9 +4,9 @@ open Ppx_box_expander.Private
 
 let deriving
   :  location -> type_declaration list -> record:(Record.t, 'output) Expander.t
-  -> tuple:(Tuple.t, 'output) Expander.t -> 'output
+  -> tuple:(Tuple.t, 'output) Expander.t -> alias:(Alias.t, 'output) Expander.t -> 'output
   =
-  fun loc type_declaration ~record ~tuple ->
+  fun loc type_declaration ~record ~tuple ~alias ->
   List.concat_map type_declaration ~f:(fun td ->
     let { ptype_name; ptype_params; ptype_kind; ptype_manifest; _ } =
       name_type_params_in_td td
@@ -27,11 +27,17 @@ let deriving
     | _, Some { ptyp_desc = Ptyp_tuple fields; _ } ->
       let fields = Common.identifiable_fields fields in
       tuple { fields; type_declaration_is_unboxed = false } loc ~type_name ~params
+    | Ptype_abstract, Some { ptyp_desc = Ptyp_constr (constr, _); _ } ->
+      alias
+        { constr; arg = Ppx_helpers.gen_var_pat_and_exp ~loc () }
+        loc
+        ~type_name
+        ~params
     | Ptype_record_unboxed_product _, _ ->
       Common.raise_unsupported
         loc
         ~why:
-          ("type must be a record, a tuple or an unboxed tuple.\n\
+          ("type must be a record, a tuple, an unboxed tuple or a type alias.\n\
             Hint: this is an unboxed rather than a boxed record.\n\
             Consider changing the record definition to be boxed, then using \""
            ^ ptype_name.txt
@@ -39,23 +45,34 @@ let deriving
     | _ ->
       Common.raise_unsupported
         loc
-        ~why:"type must be a record, a tuple or an unboxed tuple")
+        ~why:"type must be a record, a tuple, an unboxed tuple or a type alias")
 ;;
 
 (* deriving *)
 
 let () =
-  let generate ~record ~tuple =
+  let generate ~record ~tuple ~alias =
     Deriving.Generator.make
       Deriving.Args.(empty +> flag "portable")
       (fun ~loc ~path:(_ : label) ((_ : rec_flag), type_declaration) portable ->
-        deriving loc type_declaration ~record:(record ~portable) ~tuple:(tuple ~portable))
+        deriving
+          loc
+          type_declaration
+          ~record:(record ~portable)
+          ~tuple:(tuple ~portable)
+          ~alias:(alias ~portable))
   in
   let str_type_decl =
-    generate ~record:Record.structure_items ~tuple:Tuple.structure_items
+    generate
+      ~record:Record.structure_items
+      ~tuple:Tuple.structure_items
+      ~alias:Alias.structure_items
   in
   let sig_type_decl =
-    generate ~record:Record.signature_items ~tuple:Tuple.signature_items
+    generate
+      ~record:Record.signature_items
+      ~tuple:Tuple.signature_items
+      ~alias:Alias.signature_items
   in
   Deriving.add Common.box ~str_type_decl ~sig_type_decl |> Deriving.ignore
 ;;
